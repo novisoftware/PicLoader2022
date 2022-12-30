@@ -1,0 +1,1 @@
+Main-Class: com.github.novisoftware.pic2022.viewer.Main
