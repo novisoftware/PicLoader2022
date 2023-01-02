@@ -37,16 +37,9 @@ public class ColorTable {
 	private int color_p;
 
 	/**
-	 * 読み取り処理
-	 */
-	private BitReader bitReader;
-
-	/**
 	 * コンストラクタ(色キャッシュの初期化)。
 	 */
-	public ColorTable(BitReader bitReader) {
-		this.bitReader = bitReader;
-
+	public ColorTable() {
 		color = new short[CACHE_TABLE_SIZE];
 		next = new int[CACHE_TABLE_SIZE];
 		prev = new int[CACHE_TABLE_SIZE];
@@ -67,7 +60,7 @@ public class ColorTable {
 	 *            インデックス
 	 * @return 15bitの色コード(0 - 65534)
 	 */
-	private short getColor(int idx) {
+	short getColor(int idx) {
 		// 取り出した色が最新となるように更新する
 		// (取り出す色が最新ではない場合のみ実行)
 		if (color_p != idx) {
@@ -90,17 +83,29 @@ public class ColorTable {
 	}
 
 	/**
+	 * キャッシュに色が登録されているかを調べる。
+	 *
+	 * @param c 調べる対象の色
+	 * @return
+	 */
+	public int contains(short c) {
+		for (int i = 0; i < ColorTable.CACHE_TABLE_SIZE ; i++) {
+			if (color[i] == c) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/**
 	 * 新しい色をキャッシュに登録。
 	 *
 	 * @param c
 	 * @return
 	 */
-	private short regColor(short c) {
+	void regColor(short c) {
 		color_p = prev[color_p];
 		color[color_p] = c;
-
-		// ２倍するのは、キャッシュに入っている色は bit0..14 で いるのは bit1..15 だから
-		return (short)(c << 1);
 	}
 
 	/**
@@ -109,10 +114,13 @@ public class ColorTable {
 	 * @return 15bitの色コード(0 - 65534)
 	 * @throws IOException
 	 */
-	public short read() throws IOException {
+	public short read(BitReader bitReader) throws IOException {
 		if (bitReader.read(1) == 0) {
 			// キャッシュミス
-			return regColor((short)bitReader.read(15));
+			short color = (short)bitReader.read(15);
+			regColor(color);
+
+			return (short)(color << 1);
 		} else {
 			// キャッシュヒット
 			return getColor(bitReader.read(7));

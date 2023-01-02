@@ -45,7 +45,7 @@ public class PicLoader {
 			bitReader = new BitReader(file);
 
 			this.bitReader = bitReader;
-			this.colorTable = new ColorTable(bitReader);
+			this.colorTable = new ColorTable();
 			PictureInfo info = this.readHeader();
 			this.pictureInfo = info;
 			this.picture = new PictureData(info.getWidth(), info.getHeight());
@@ -203,6 +203,8 @@ public class PicLoader {
 		short c = 0; // 現在の色。(初期値0)
 		for (;;) {
 			length = readLength(); // 長さ読み込み
+			// 【取ってつけたデバッグ】
+			//  if (y == 0 ) {System.out.println("LENGTH READ: " + length);}
 
 			// 次の変化点まで繰り返す
 			while (--length != 0) {
@@ -227,13 +229,15 @@ public class PicLoader {
 				x = 0;
 			}
 			// 新しい色の読み込み
-			c = this.colorTable.read();
+			c = this.colorTable.read(bitReader);
+			// 【取ってつけたデバッグ】 // if (y == 0 ) {System.out.printf("色: %6x\n", c );}
 
 			// それを書いて
 			picture.pset(x, y, c);
 
 			// 連鎖ありなら、連鎖の展開
 			if (bitReader.read(1) != 0) {
+				// 【取ってつけたデバッグ】 // if (y == 0 ) {System.out.println("連鎖あり");}
 				expand_chain(picture, x, y, c);
 			}
 
@@ -263,7 +267,7 @@ public class PicLoader {
 		// コメント部
 		StringBuilder sb = new StringBuilder();
 		int	c;
-		while ((c = bitReader.read(8)) != 26) {
+		while ((c = bitReader.read(8)) != 0x1a) {
 			char ch = (char)c;
 			sb.append(ch);
 		}
