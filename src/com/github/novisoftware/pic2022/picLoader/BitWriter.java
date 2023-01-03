@@ -30,7 +30,7 @@ public class BitWriter {
 	private int profile[] = new int[6];
 
 	/**
-	 *
+	 * プロファイルの種類
 	 */
 	static public final int PROFILE_HEADER = 0;
 	static public final int PROFILE_COLOR_CACHED = 1;
@@ -39,6 +39,9 @@ public class BitWriter {
 	static public final int PROFILE_CHAIN = 4;
 	static public final int PROFILE_PADDING = 5;
 
+	/**
+	 * 集計したプロファイルを表示する
+	 */
 	public void printProfile() {
 		String[] profileName = {
 				"header",
@@ -79,7 +82,6 @@ public class BitWriter {
 	public void write(int data, int bit, int profileIndex) throws IOException {
 		profile[profileIndex] += bit;
 
-
 		buffer = (buffer << bit) | (data & ((1 << bit) - 1));
 		nowBit += bit;
 
@@ -95,8 +97,8 @@ public class BitWriter {
 	public void flush() throws IOException {
 		if (nowBit != 0) {
 			this.write(0, 8 - nowBit, BitWriter.PROFILE_PADDING);
+			nowBit = 0;
 		}
-		nowBit = 0;
 	}
 
 	/**

@@ -38,91 +38,66 @@ public class PicEncoder {
 	 * @param y 開始Y座標
 	 * @param color 色
 	 * @return
+	 * @throws IOException
 	 */
-	ArrayList<Integer> checkChain(boolean[][] ignore, int x, int y, short color) {
-		ArrayList<Integer> chain = new ArrayList<>();
+	 private final void checkAndWriteChain(boolean[][] ignore, int x, int y, short color) throws IOException {
+		boolean isFirst = true;
 
 		for(y++; y < picture.height; y++) {
+			int pos;
 			if (x > 1 && picture.point(x - 2, y) == color) {
 				// さらに左隣が同色の場合は連鎖データを作らなくても良い。
 				if (x > 2 &&  picture.point(x - 3, y) == color) {
 					break;
 				}
-
-				chain.add(-2);
-				ignore[y][x-2] = true;
-
-				x -= 2;
-				continue;
+				pos = -2; // 左2ドット
 			}
 			else if (x > 0 && picture.point(x - 1, y) == color) {
-				chain.add(-1);
-
-				ignore[y][x-1] = true;
-
-				x--;
-				continue;
+				pos = -1; // 左下
 			}
 			else if (picture.point(x, y) == color) {
-				chain.add(0);
-				ignore[y][x] = true;
-				continue;
+				pos = 0; // 真下
 			}
 			else if (x < picture.width - 1 && picture.point(x + 1, y) == color) {
-				chain.add(1);
-
-				ignore[y][x+1] = true;
-
-				x++;
-				continue;
+				pos = 1; // 右下
 			}
 			else if (x < picture.width - 2  && picture.point(x - 2, y) == color) {
-				chain.add(2);
-
-				ignore[y][x+2] = true;
-				x += 2;
-				continue;
+				pos = 2; // 右2ドット
 			} else {
 				break;
 			}
-		}
 
-		return chain;
-	}
-
-	/**
-	 * 連鎖データを出力する
-	 *
-	 * @param chain
-	 * @throws IOException
-	 */
-	public void writeChain(ArrayList<Integer> chain) throws IOException {
-		if (chain.size() == 0) {
-			// 連鎖なし
-			bitWriter.write(0, 1, BitWriter.PROFILE_CHAIN);
-			return;
-		}
-
-		// 連鎖あり
-		bitWriter.write(1, 1, BitWriter.PROFILE_CHAIN);
-		for (int code : chain) {
-			if (code == -1) {  // 左下
-				bitWriter.write(1, 2, BitWriter.PROFILE_CHAIN);
-			} else if (code == 0) { // 真下
-				bitWriter.write(2, 2, BitWriter.PROFILE_CHAIN);
-			} else if (code == 1) { // 右下
-				bitWriter.write(3, 2, BitWriter.PROFILE_CHAIN);
-			} else if (code == -2) { // 左2ドット
-				bitWriter.write(2, 4, BitWriter.PROFILE_CHAIN);
-			} else if (code == 2) {  // 右2ドット
-				bitWriter.write(3, 4, BitWriter.PROFILE_CHAIN);
+			if (isFirst) {
+				isFirst = false;
+				bitWriter.write(1, 1, BitWriter.PROFILE_CHAIN); // 連鎖あり
 			}
-			else {
-				; // ここには到達しない
+			switch(pos) {
+			case -2:
+				bitWriter.write(2, 4, BitWriter.PROFILE_CHAIN); // 左2ドット
+				break;
+			case -1:
+				bitWriter.write(1, 2, BitWriter.PROFILE_CHAIN); // 左下
+				break;
+			case 0:
+				bitWriter.write(2, 2, BitWriter.PROFILE_CHAIN); // 真下
+				break;
+			case 1:
+				bitWriter.write(3, 2, BitWriter.PROFILE_CHAIN); // 右下
+				break;
+			case 2:
+				bitWriter.write(3, 4, BitWriter.PROFILE_CHAIN); // 右2ドット
+				break;
 			}
+
+			x += pos;
+			ignore[y][x] = true;
 		}
-		// 連鎖おわり
-		bitWriter.write(0, 3, BitWriter.PROFILE_CHAIN);
+
+		if (!isFirst) {
+			bitWriter.write(0, 3, BitWriter.PROFILE_CHAIN); // 連鎖おわり
+		} else {
+			bitWriter.write(0, 1, BitWriter.PROFILE_CHAIN); // 連鎖なし
+		}
 	}
 
 /*
@@ -145,7 +120,7 @@ public class PicEncoder {
 	 * @return 長さ(単位: bit)
 	 * @throws IOException
 	 */
-	public void writeLength(int length) throws IOException {
+	private final void writeLength(int length) throws IOException {
 		int binData = length - 1;
 		for (int i = 1; ; i++) {
 			if ((length - 1) < (2 << i) - 2) {
@@ -166,8 +141,8 @@ public class PicEncoder {
 	 * @return 長さ(単位: bit)
 	 * @throws IOException
 	 */
-	public void writeColor(ColorTable colorTable, short argColor) throws IOException {
-		short color = (short)((argColor >> 1) & 0xfffe);
+	private final void writeColor(ColorTable colorTable, short argColor) throws IOException {
+		short color = (short)((argColor >> 1) & 0x7fff);
 
 		int index = colorTable.contains(color);
 		if (index != -1) {
@@ -188,6 +163,7 @@ public class PicEncoder {
 	 */
 	public void encode() throws IOException {
 		ColorTable colorTable = new ColorTable();
+		colorTable.initToEncode();
 
 		int height = picture.height;
 		int width = picture.width;
@@ -217,10 +193,12 @@ public class PicEncoder {
 		length = 0;
 
 		while (true) {
-			// 現在の色を更新
+			// 現在の色を更新する
 			color = picture.point(x, y);
-			// 連鎖データを作成
-			ArrayList<Integer> chain = this.checkChain(ignore, x, y, color);
+			this.writeColor(colorTable, color);
+
+			// 連鎖を調べ、無視ビットマップの更新と、連鎖データの出力を行う
+			this.checkAndWriteChain(ignore, x, y, color);
 
 			// ランレングスを求める
 			while (ignore[y][x] || picture.point(x, y) == color) {
@@ -235,9 +213,6 @@ public class PicEncoder {
 					}
 				}
 			}
-
-			this.writeColor(colorTable, color);
-			this.writeChain(chain);
 			this.writeLength(length);
 			length = 0;
 
@@ -279,32 +254,6 @@ public class PicEncoder {
 	}
 
 	/**
-	 * 画像データを15bitデータに変換する
-	 *
-	 * @param source 元画像
-	 * @return 画像データ
-	 */
-	static public PictureData create15bitData(BufferedImage source) {
-		int width = source.getWidth();
-		int height = source.getHeight();
-
-		PictureData picture = new PictureData(width, height);
-
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				int color = source.getRGB(x, y);
-				int g = (color >> 16) & 0xFF;
-				int r = (color >> 8) & 0xFF;
-				int b =  color & 0xFF;
-				int color15bit = ((r >> 3) << 11) | ((g >> 3) << 6) | ((b >> 3) << 1);
-				picture.pset(x, y, (short)color15bit);
-			}
-		}
-
-		return picture;
-	}
-
-	/**
 	 * CLIから呼び出されることを想定した呼び出し口。
 	 * メッセージを標準出力あてに出力する。
 	 *
@@ -316,20 +265,29 @@ public class PicEncoder {
 		File inputFile = new File(input);
 		File outputFile = new File(output);
 
-		BufferedImage image =ImageIO.read(inputFile);
+		long time0 = System.nanoTime();
+		BufferedImage sourceImage =ImageIO.read(inputFile);
+		long time1 = System.nanoTime();
 
-		System.out.println("input:  " + inputFile.getName());
-		System.out.println("output: " + outputFile.getName());
-		System.out.println("width:  " + image.getWidth());
-		System.out.println("height: " + image.getHeight());
+		PictureData picture = new PictureData(sourceImage);
+		long time2 = System.nanoTime();
 
-		PictureData picture = PicEncoder.create15bitData(image);
 		PicEncoder encoder = new PicEncoder(picture, outputFile);
 		encoder.writeHeader();
 		encoder.encode();
+		long time3 = System.nanoTime();
+
+		System.out.println("input:  " + inputFile.getName());
+		System.out.println("output: " + outputFile.getName());
+		System.out.println("width:  " + sourceImage.getWidth());
+		System.out.println("height: " + sourceImage.getHeight());
 
 		System.out.println();
 		System.out.println("data size breakdown(bit): ");
 		encoder.bitWriter.printProfile();
+		System.out.println();
+		System.out.printf("load time                 [ms]: %8.3f\n",  (time1 - time0) / 1000000.0);
+		System.out.printf("convert(15bit color) time [ms]: %8.3f\n",  (time2 - time1) / 1000000.0);
+		System.out.printf("encode time               [ms]: %8.3f\n",  (time3 - time2) / 1000000.0);
 	}
 }

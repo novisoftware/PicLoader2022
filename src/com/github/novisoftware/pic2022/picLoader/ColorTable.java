@@ -82,29 +82,42 @@ public class ColorTable {
 		return (short)(color[idx] << 1);
 	}
 
+	private int[] reverseIndex;
+
+	public void initToEncode() {
+		reverseIndex = new int[1 << 15];
+	}
+
 	/**
 	 * キャッシュに色が登録されているかを調べる。
 	 *
 	 * @param c 調べる対象の色
-	 * @return
+	 * @return 登録されていない場合は -1 。登録されている場合はインデックス番号。
 	 */
 	public int contains(short c) {
+		/*
+		// 処理結果が同じという意味では、以下のようなループで調べるのでも良い。
 		for (int i = 0; i < ColorTable.CACHE_TABLE_SIZE ; i++) {
 			if (color[i] == c) {
 				return i;
 			}
 		}
-		return -1;
+		*/
+		return reverseIndex[c] - 1;
 	}
 
 	/**
 	 * 新しい色をキャッシュに登録。
 	 *
-	 * @param c
+	 * @param c 登録する色
 	 * @return
 	 */
 	void regColor(short c) {
 		color_p = prev[color_p];
+		if (reverseIndex != null) {
+			reverseIndex[color[color_p]] = 0;
+			reverseIndex[c] = color_p + 1;
+		}
 		color[color_p] = c;
 	}
 

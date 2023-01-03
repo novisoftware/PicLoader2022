@@ -1,5 +1,7 @@
 package com.github.novisoftware.pic2022.picLoader;
 
+import java.awt.image.BufferedImage;
+
 /**
  * GVRAM相当。
  *
@@ -8,9 +10,9 @@ package com.github.novisoftware.pic2022.picLoader;
  * バッファは各ピクセル 65536色 を記憶する。
  */
 public class PictureData {
-	short[][] buffer;
-	int width;
-	int height;
+	final short[][] buffer;
+	final int width;
+	final int height;
 
 	public PictureData(int width, int height) {
 		this.width = width;
@@ -26,24 +28,51 @@ public class PictureData {
 		buffer = new short[width][height];
 	}
 
-	public void pset(int x, int y, short color) {
+
+	/**
+	 * BufferedImageを元に画像データを作成する。
+	 *
+	 * @param source 元画像
+	 */
+	public PictureData(BufferedImage source) {
+		this.width = source.getWidth();
+		this.height = source.getHeight();
+
+		int width = this.width;
+		int height = this.height;
+		buffer = new short[width][height];
+
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int color = source.getRGB(x, y);
+				int g = (color >> 16) & 0xFF;
+				int r = (color >> 8) & 0xFF;
+				int b =  color & 0xFF;
+				int color15bit = ((r >> 3) << 11) | ((g >> 3) << 6) | ((b >> 3) << 1);
+				this.pset(x, y, (short)color15bit);
+			}
+		}
+	}
+
+
+	public final void pset(int x, int y, short color) {
 		if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
 			this.buffer[x][y] = color;
 		}
 	}
 
-	public short point(int x, int y) {
+	public final short point(int x, int y) {
 		if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
 			return this.buffer[x][y];
 		}
 		return 0;
 	}
 
-	public int getWidth() {
+	public final int getWidth() {
 		return this.width;
 	}
 
-	public int getHeight() {
+	public final int getHeight() {
 		return this.height;
 	}
 }
