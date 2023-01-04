@@ -4,7 +4,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 
 import javax.imageio.ImageIO;
 
@@ -50,12 +49,25 @@ public class PicEncoder {
 				if (x > 2 &&  picture.point(x - 3, y) == color) {
 					break;
 				}
+				// または、画面右端から同色の場合、連鎖データを作らなくても良い。
+				if (x == 2 && y > 1 && picture.point(picture.width - 1, y - 1) == color) {
+					break;
+				}
+
 				pos = -2; // 左2ドット
 			}
 			else if (x > 0 && picture.point(x - 1, y) == color) {
+				// 画面右端から同色の場合、連鎖データを作らなくても良い。
+				if (x == 1 && y > 1 && picture.point(picture.width - 1, y - 1) == color) {
+					break;
+				}
 				pos = -1; // 左下
 			}
 			else if (picture.point(x, y) == color) {
+				// 画面右端から同色の場合、連鎖データを作らなくても良い。
+				if (x == 0 && y > 1 && picture.point(picture.width - 1, y - 1) == color) {
+					break;
+				}
 				pos = 0; // 真下
 			}
 			else if (x < picture.width - 1 && picture.point(x + 1, y) == color) {
