@@ -214,6 +214,10 @@ public class PicEncoder {
 
 			// ランレングスを求める
 			while (ignore[y][x] || picture.point(x, y) == color) {
+				if (ignore[y][x]) {
+					color = picture.point(x, y);
+				}
+
 				length++;
 
 				x++;

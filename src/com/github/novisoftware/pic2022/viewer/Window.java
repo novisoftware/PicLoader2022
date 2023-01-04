@@ -2,8 +2,10 @@ package com.github.novisoftware.pic2022.viewer;
 
 import java.awt.Color;
 import java.awt.Container;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -27,6 +29,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 import com.github.novisoftware.pic2022.picLoader.NotifyInterface;
@@ -37,15 +40,50 @@ import com.github.novisoftware.pic2022.picLoader.PictureData;
 
 class MyPanel extends JPanel implements NotifyInterface, Runnable, MouseListener, KeyListener {
 	PictureData nullPicture = new PictureData(512, 512);
-	PictureData pictureData;
+	private PictureData pictureData;
 	final int RENDER_MODE_NUMBER = 3;
 	int renderMode;
 	final Window parent;
+
+	private JScrollPane scrollPane;
 
 	MyPanel(Window parent) {
 		this.parent = parent;
 		this.addMouseListener(this);
 		// this.addKeyListener(this);
+	}
+
+	void setScrollPane(JScrollPane scrollPane) {
+		this.scrollPane = scrollPane;
+	}
+
+	void setPicutureData(PictureData pictureData) {
+		this.pictureData = pictureData;
+
+		// 倍率
+		int xw = 1, xh = 1;
+		switch (renderMode) {
+		case 0:
+			xw = 1;
+			xh = 1;
+			break;
+		case 1:
+			xw = 2;
+			xh = 2;
+			break;
+		case 2:
+			xw = 3;
+			xh = 2;
+			break;
+		}
+
+		Dimension d = new Dimension(pictureData.getHeight() * xw, pictureData.getWidth() * xh);
+
+		this.setPreferredSize(d);
+		this.scrollPane.setPreferredSize(d);
+//		this.parent.getContentPane().repaint();
+		this.parent.getContentPane().repaint();
+		this.parent.setSize(this.parent.getSize());
 	}
 
 	/**
@@ -60,8 +98,20 @@ class MyPanel extends JPanel implements NotifyInterface, Runnable, MouseListener
 			p = this.nullPicture;
 		}
 
-		for (int x = 0; x < Window.INITIAL_WIDTH ; x++) {
-			for (int y = 0; y < Window.INITIAL_HEIGHT ; y++) {
+		int width = p.getWidth();
+		int height = p.getHeight();
+
+
+		Dimension nowDim = this.getSize();
+
+
+		if (nowDim.width > width || nowDim.height > height) {
+			g2.setColor(Color.BLACK);
+			g2.fillRect(0, 0, nowDim.width, nowDim.height);
+		}
+
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
 				int c = p.point(x, y);
 				// X68000の16bitカラーを Java の Color オブジェクトに変換
 				// LSB(輝度ビット。最下位ビットに位置)はPIC.Rの描画結果に含まれていないので考慮しない
@@ -104,15 +154,20 @@ class MyPanel extends JPanel implements NotifyInterface, Runnable, MouseListener
 	 * @param renderMode
 	 */
 	void setSizeWithRenderMode(int renderMode) {
+		Insets insets = parent.getInsets();
+
 		switch (renderMode) {
 		case 0:
-			parent.setSize(Window.INITIAL_WIDTH, Window.INITIAL_HEIGHT);
+			parent.setSize(Window.INITIAL_WIDTH + insets.left + insets.right,
+					Window.INITIAL_HEIGHT + insets.top + insets.bottom);
 			break;
 		case 1:
-			parent.setSize(Window.INITIAL_WIDTH  * 2, Window.INITIAL_HEIGHT * 2);
+			parent.setSize(Window.INITIAL_WIDTH  * 2 + insets.left + insets.right,
+					Window.INITIAL_HEIGHT * 2 + insets.top + insets.bottom);
 			break;
 		case 2:
-			parent.setSize(Window.INITIAL_WIDTH  * 3, Window.INITIAL_HEIGHT * 2);
+			parent.setSize(Window.INITIAL_WIDTH  * 3 + insets.left + insets.right,
+					Window.INITIAL_HEIGHT * 2 + insets.top + insets.bottom);
 			break;
 		}
 	}
@@ -318,7 +373,13 @@ public class Window extends JFrame implements DragGestureListener, DropTargetLis
 		this.addKeyListener(this.innerPanel);
 
 		Container contentPane = getContentPane();
-	    contentPane.add(this.innerPanel);
+	    JScrollPane scrollPane = new JScrollPane(this.innerPanel);
+	    scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+	    scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+	    contentPane.add(scrollPane);
+
+	    this.innerPanel.setScrollPane(scrollPane);
+
 
 	    // ウィンドウのアイコンを設定
 		try {
@@ -346,7 +407,7 @@ public class Window extends JFrame implements DragGestureListener, DropTargetLis
 	 */
 	public void load(File f, boolean fromHistory) {
 		if (f == null) {
-			this.innerPanel.pictureData = this.innerPanel.nullPicture;
+			this.innerPanel.setPicutureData(this.innerPanel.nullPicture);
 			this.innerPanel.repaint();
 			this.setTitle("");
 			return;
@@ -356,7 +417,7 @@ public class Window extends JFrame implements DragGestureListener, DropTargetLis
 
 		try {
 			PicLoader picLoader = new PicLoader(f, this.innerPanel, this.isWeight);
-			this.innerPanel.pictureData = picLoader.getPicture();
+			this.innerPanel.setPicutureData(picLoader.getPicture());
 			this.runningPicLoader = picLoader;
 			if (!fromHistory) {
 				this.history.add(f);
@@ -379,11 +440,11 @@ public class Window extends JFrame implements DragGestureListener, DropTargetLis
 			}).start();
 		} catch (IOException e) {
 			this.setTitle(f.getName() + " 【エラー】" + e.toString());
-			this.innerPanel.pictureData = null;
+			this.innerPanel.setPicutureData(this.innerPanel.nullPicture);
 			this.innerPanel.repaint();
 		} catch (PicDecodeException e) {
 			this.setTitle(f.getName() + " 【エラー】" + e.getMessage());
-			this.innerPanel.pictureData = null;
+			this.innerPanel.setPicutureData(this.innerPanel.nullPicture);
 			this.innerPanel.repaint();
 		}
 	}
